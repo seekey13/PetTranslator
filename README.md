@@ -126,11 +126,16 @@ MIT License. See [LICENSE](LICENSE) for details.
 - Author: Seekey
 - Inspired by the need for consistent pet command syntax across pet jobs.
 
-
 ## Support
 
 Open an issue or pull request on the [GitHub repository](https://github.com/seekey13/PetTranslator) if you have suggestions or encounter problems.
 
+## Special Thanks
+
+[Commandobill](https://github.com/commandobill), [Xenonsmurf](https://github.com/Xenonsmurf), [atom0s](https://github.com/atom0s), and [Carver](https://github.com/CatsEyeXI)
+
+Completely unnecessary AI generated image  
+<img width="200" alt="App" src="https://github.com/user-attachments/assets/e3ce85a9-2db0-434c-8930-36d9f83750dd" />
 
 ## Changelog
 
