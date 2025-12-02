@@ -35,6 +35,54 @@ local pettranslator = T{
 };
 
 -- ============================================================================
+-- Pet Command Lookup Tables
+-- ============================================================================
+
+-- Pet command translations by job
+-- Structure: [job][command_type] = { name = "ability_name", level = min_level }
+local pet_commands = T{
+    BST = T{
+        go = T{ name = 'Fight', level = 1 },
+        stop = T{ name = 'Heel', level = 10 },
+        bye = T{ name = 'Leave', level = 35 },
+    },
+    PUP = T{
+        go = T{ name = 'Deploy', level = 1 },
+        stop = T{ name = 'Retrieve', level = 10 },
+        bye = T{ name = 'Deactivate', level = 1 },
+    },
+    SMN = T{
+        go = T{ name = 'Assault', level = 1 },
+        stop = T{ name = 'Retreat', level = 1 },
+        bye = T{ name = 'Release', level = 1 },
+    },
+}
+
+-- Get the pet command name for a given job and command type
+-- Parameters:
+--   job: 'BST', 'SMN', or 'PUP'
+--   command_type: 'go', 'stop', or 'bye'
+--   level: player's current job level
+-- Returns: ability name string or nil if not available
+local function get_pet_command(job, command_type, level)
+    if not pet_commands[job] then
+        return nil
+    end
+    
+    local cmd = pet_commands[job][command_type]
+    if not cmd then
+        return nil
+    end
+    
+    -- Check if player meets level requirement
+    if level < cmd.level then
+        return nil
+    end
+    
+    return cmd.name
+end
+
+-- ============================================================================
 -- Job State Management
 -- ============================================================================
 
