@@ -9,7 +9,7 @@ This addon is designed for Ashita v4 and the CatsEyeXI private server.
 
 addon.name      = 'PetTranslator';
 addon.author    = 'Seekey';
-addon.version   = '0.1';
+addon.version   = '1.0';
 addon.desc      = 'Translates pet abilities to readable names for BST, SMN, and PUP.';
 addon.link      = 'https://github.com/seekey13/PetTranslator';
 
@@ -33,6 +33,7 @@ local pettranslator = T{
     settings = default_settings,
     current_job = nil,  -- Will be 'BST', 'SMN', 'PUP', or nil
     job_level = 0,
+    last_job = nil,     -- Track last known job for change detection
 };
 
 -- ============================================================================
@@ -106,6 +107,11 @@ local function reset_job_state()
     pettranslator.job_level = 0
 end
 
+-- Get safe job name for display (handles nil values)
+local function get_safe_job_name(job)
+    return job or 'None'
+end
+
 -- ============================================================================
 -- Job State Management
 -- ============================================================================
@@ -150,6 +156,32 @@ local function update_job_state()
     return job_name
 end
 
+-- Handle job change logic
+local function handle_job_change()
+    local new_job = update_job_state()
+    
+    -- Check if job actually changed
+    if new_job == pettranslator.last_job then
+        return
+    end
+    
+    -- Job changed - display message
+    if new_job then
+        print_msg(string.format('Job change detected: %s -> %s (Level %d)', 
+            get_safe_job_name(pettranslator.last_job),
+            new_job,
+            pettranslator.job_level))
+    elseif pettranslator.last_job then
+        -- Changed from pet job to non-pet job
+        print_msg(string.format('Job change detected: %s -> %s (addon dormant)', 
+            get_safe_job_name(pettranslator.last_job),
+            get_safe_job_name(new_job)))
+    end
+    
+    -- Update tracking
+    pettranslator.last_job = new_job
+end
+
 -- ============================================================================
 -- Event Handlers
 -- ============================================================================
@@ -157,10 +189,22 @@ end
 ashita.events.register('load', 'pt_load', function()
     -- Initialize job state
     local job = update_job_state()
+    pettranslator.last_job = job
+    
     if job then
         print_msg(string.format('Detected job: %s (Level %d)', job, pettranslator.job_level))
     else
         print_msg('No pet job detected (addon dormant)')
+    end
+end)
+
+-- Listen for job change packets (0x1B, 0x44, 0x1A)
+ashita.events.register('packet_in', 'pt_packet_in', function(e)
+    -- 0x1B = job info, 0x44 = character update, 0x1A = party update
+    if (e.id == 0x1B or e.id == 0x44 or e.id == 0x1A) then
+        ashita.tasks.once(0.5, function()
+            handle_job_change()
+        end)
     end
 end)
 
