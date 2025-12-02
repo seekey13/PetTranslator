@@ -2,9 +2,6 @@
 
 PetTranslator is an Ashita v4 addon for Final Fantasy XI that simplifies pet command management for Beastmaster, Summoner, and Puppetmaster jobs by translating generic commands into job-specific pet abilities.
 
-> **Note:**  
-> This addon is designed for Ashita v4 and the [CatsEyeXI private server](https://www.catseyexi.com/).
-
 
 ## Features
 
