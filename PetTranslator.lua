@@ -207,13 +207,21 @@ ashita.events.register('command', 'pt_command', function(e)
         local ability_name = get_pet_command(pettranslator.current_job, cmd, pettranslator.job_level)
         
         if not ability_name then
-            print(chat.header(addon.name):append(chat.error(string.format('Command "%s" not available for %s at level %d', 
-                cmd, pettranslator.current_job, pettranslator.job_level))))
             return
         end
         
+        -- Determine target based on command type
+        local target
+        if cmd == 'go' then
+            -- For "go", use specified target or default to <t>
+            target = args[3] or '<t>'
+        else
+            -- For "stop" and "bye", always use <me>
+            target = '<me>'
+        end
+        
         -- Issue the pet command
-        local pet_cmd = string.format('/pet "%s" <me>', ability_name)
+        local pet_cmd = string.format('/pet "%s" %s', ability_name, target)
         AshitaCore:GetChatManager():QueueCommand(-1, pet_cmd)
         
         if pettranslator.settings.debug_mode then
