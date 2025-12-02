@@ -14,6 +14,7 @@ addon.desc      = 'Translates pet abilities to readable names for BST, SMN, and 
 addon.link      = 'https://github.com/seekey13/PetTranslator';
 
 require('common');
+local chat = require('chat');
 
 -- ============================================================================
 -- Configuration
@@ -35,8 +36,15 @@ local pettranslator = T{
 };
 
 -- ============================================================================
--- Pet Command Lookup Tables
+-- Lookup Tables
 -- ============================================================================
+
+-- Job ID to name mapping
+local job_ids = T{
+    [9] = 'BST',
+    [15] = 'SMN',
+    [18] = 'PUP',
+}
 
 -- Pet command translations by job
 -- Structure: [job][command_type] = { name = "ability_name", level = min_level }
@@ -83,6 +91,22 @@ local function get_pet_command(job, command_type, level)
 end
 
 -- ============================================================================
+-- Helper Functions
+-- ============================================================================
+
+-- Print a message with addon header
+local function print_msg(msg, is_error)
+    local output = chat.header(addon.name):append(is_error and chat.error(msg) or chat.message(msg))
+    print(output)
+end
+
+-- Reset job state to nil/0
+local function reset_job_state()
+    pettranslator.current_job = nil
+    pettranslator.job_level = 0
+end
+
+-- ============================================================================
 -- Job State Management
 -- ============================================================================
 
@@ -95,8 +119,7 @@ local function update_job_state()
     end)
     
     if not ok or not player then
-        pettranslator.current_job = nil
-        pettranslator.job_level = 0
+        reset_job_state()
         return nil
     end
     
@@ -105,8 +128,7 @@ local function update_job_state()
     end)
     
     if not ok_jobs then
-        pettranslator.current_job = nil
-        pettranslator.job_level = 0
+        reset_job_state()
         return nil
     end
     
@@ -115,20 +137,12 @@ local function update_job_state()
     end)
     
     if not ok_levels then
-        pettranslator.current_job = nil
-        pettranslator.job_level = 0
+        reset_job_state()
         return nil
     end
     
-    -- Job IDs: 9 = BST, 15 = SMN, 18 = PUP
-    local job_name = nil
-    if main_job == 9 then
-        job_name = 'BST'
-    elseif main_job == 15 then
-        job_name = 'SMN'
-    elseif main_job == 18 then
-        job_name = 'PUP'
-    end
+    -- Look up job name from ID
+    local job_name = job_ids[main_job]
     
     pettranslator.current_job = job_name
     pettranslator.job_level = job_name and main_level or 0
@@ -141,19 +155,13 @@ end
 -- ============================================================================
 
 ashita.events.register('load', 'pt_load', function()
-    print(chat.header(addon.name):append(chat.message('v'..addon.version..' loaded')))
-    
     -- Initialize job state
     local job = update_job_state()
     if job then
-        print(chat.header(addon.name):append(chat.message(string.format('Detected job: %s (Level %d)', job, pettranslator.job_level))))
+        print_msg(string.format('Detected job: %s (Level %d)', job, pettranslator.job_level))
     else
-        print(chat.header(addon.name):append(chat.message('No pet job detected (addon dormant)')))
+        print_msg('No pet job detected (addon dormant)')
     end
-end)
-
-ashita.events.register('unload', 'pt_unload', function()
-    print(chat.header(addon.name):append(chat.message('unloaded')))
 end)
 
 ashita.events.register('d3d_present', 'pt_loop', function()
@@ -185,12 +193,10 @@ ashita.events.register('command', 'pt_command', function(e)
     
     -- No arguments - show status
     if #args == 1 then
-        if pettranslator.current_job then
-            print(chat.header(addon.name):append(chat.message(string.format('Current job: %s (Level %d)', 
-                pettranslator.current_job, pettranslator.job_level))))
-        else
-            print(chat.header(addon.name):append(chat.message('No pet job detected')))
-        end
+        local status = pettranslator.current_job 
+            and string.format('Current job: %s (Level %d)', pettranslator.current_job, pettranslator.job_level)
+            or 'No pet job detected'
+        print_msg(status)
         return
     end
     
@@ -225,12 +231,12 @@ ashita.events.register('command', 'pt_command', function(e)
         AshitaCore:GetChatManager():QueueCommand(-1, pet_cmd)
         
         if pettranslator.settings.debug_mode then
-            print(chat.header(addon.name):append(chat.message(string.format('Executing: %s', pet_cmd))))
+            print_msg(string.format('Executing: %s', pet_cmd))
         end
         
         return
     end
     
     -- Unknown command
-    print(chat.header(addon.name):append(chat.error(string.format('Unknown command: %s', cmd))))
+    print_msg(string.format('Unknown command: %s', cmd), true)
 end)
