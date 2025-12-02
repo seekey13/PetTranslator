@@ -196,6 +196,33 @@ ashita.events.register('command', 'pt_command', function(e)
     
     local cmd = args[2]:lower()
     
+    -- Handle pet commands: go, stop, bye
+    if cmd == 'go' or cmd == 'stop' or cmd == 'bye' then
+        -- Check if we have a valid pet job
+        if not pettranslator.current_job then
+            return
+        end
+        
+        -- Get the job-specific ability name
+        local ability_name = get_pet_command(pettranslator.current_job, cmd, pettranslator.job_level)
+        
+        if not ability_name then
+            print(chat.header(addon.name):append(chat.error(string.format('Command "%s" not available for %s at level %d', 
+                cmd, pettranslator.current_job, pettranslator.job_level))))
+            return
+        end
+        
+        -- Issue the pet command
+        local pet_cmd = string.format('/pet "%s" <me>', ability_name)
+        AshitaCore:GetChatManager():QueueCommand(-1, pet_cmd)
+        
+        if pettranslator.settings.debug_mode then
+            print(chat.header(addon.name):append(chat.message(string.format('Executing: %s', pet_cmd))))
+        end
+        
+        return
+    end
+    
     -- Unknown command
     print(chat.header(addon.name):append(chat.error(string.format('Unknown command: %s', cmd))))
 end)
