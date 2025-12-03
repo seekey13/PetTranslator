@@ -16,21 +16,16 @@ addon.link      = 'https://github.com/seekey13/PetTranslator';
 require('common');
 local chat = require('chat');
 
--- ============================================================================
--- Configuration
--- ============================================================================
-
-local default_settings = T{
-    -- Debug
-    debug_mode = false,
-};
+-- Custom print functions for categorized output.
+local function printf(fmt, ...)  print(chat.header(addon.name) .. chat.message(fmt:format(...))) end
+local function warnf(fmt, ...)   print(chat.header(addon.name) .. chat.warning(fmt:format(...))) end
+local function errorf(fmt, ...)  print(chat.header(addon.name) .. chat.error  (fmt:format(...))) end
 
 -- ============================================================================
 -- State Management
 -- ============================================================================
 
 local pettranslator = T{
-    settings = default_settings,
     current_job = nil,  -- Will be 'BST', 'SMN', 'PUP', or nil
     job_level = 0,
     last_job = nil,     -- Track last known job for change detection
@@ -94,12 +89,6 @@ end
 -- ============================================================================
 -- Helper Functions
 -- ============================================================================
-
--- Print a message with addon header
-local function print_msg(msg, is_error)
-    local output = chat.header(addon.name):append(is_error and chat.error(msg) or chat.message(msg))
-    print(output)
-end
 
 -- Reset job state to nil/0
 local function reset_job_state()
@@ -200,15 +189,15 @@ local function handle_job_change()
     
     -- Job changed - display message
     if new_job then
-        print_msg(string.format('Job change detected: %s -> %s (Level %d)', 
+        printf('Job change detected: %s -> %s (Level %d)', 
             get_safe_job_name(pettranslator.last_job),
             new_job,
-            pettranslator.job_level))
+            pettranslator.job_level)
     elseif pettranslator.last_job then
         -- Changed from pet job to non-pet job
-        print_msg(string.format('Job change detected: %s -> %s (addon dormant)', 
+        printf('Job change detected: %s -> %s (addon dormant)', 
             get_safe_job_name(pettranslator.last_job),
-            get_safe_job_name(new_job)))
+            get_safe_job_name(new_job))
     end
     
     -- Update tracking
@@ -225,9 +214,9 @@ ashita.events.register('load', 'pt_load', function()
     pettranslator.last_job = job
     
     if job then
-        print_msg(string.format('Detected job: %s (Level %d)', job, pettranslator.job_level))
+        printf('Detected job: %s (Level %d)', job, pettranslator.job_level)
     else
-        print_msg('No pet job detected (addon dormant)')
+        printf('No pet job detected (addon dormant)')
     end
 end)
 
@@ -270,10 +259,11 @@ ashita.events.register('command', 'pt_command', function(e)
     
     -- No arguments - show status
     if #args == 1 then
-        local status = pettranslator.current_job 
-            and string.format('Current job: %s (Level %d)', pettranslator.current_job, pettranslator.job_level)
-            or 'No pet job detected'
-        print_msg(status)
+        if pettranslator.current_job then
+            printf('Current job: %s (Level %d)', pettranslator.current_job, pettranslator.job_level)
+        else
+            warnf('No pet job detected')
+        end
         return
     end
     
@@ -295,7 +285,7 @@ ashita.events.register('command', 'pt_command', function(e)
         
         -- Check if player has an active pet
         if not has_pet() then
-            print_msg('No pet detected', true)
+            warnf('No pet detected')
             return
         end
         
@@ -313,13 +303,9 @@ ashita.events.register('command', 'pt_command', function(e)
         local pet_cmd = string.format('/pet "%s" %s', ability_name, target)
         AshitaCore:GetChatManager():QueueCommand(-1, pet_cmd)
         
-        if pettranslator.settings.debug_mode then
-            print_msg(string.format('Executing: %s', pet_cmd))
-        end
-        
         return
     end
     
     -- Unknown command
-    print_msg(string.format('Unknown command: %s', cmd), true)
+    errorf('Unknown command: %s', cmd)
 end)
