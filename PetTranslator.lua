@@ -112,6 +112,39 @@ local function get_safe_job_name(job)
     return job or 'None'
 end
 
+-- Check if player has an active pet
+-- Returns: boolean (true if pet is active, false otherwise)
+local function has_pet()
+    -- Get player entity
+    local ok, player = pcall(function()
+        return GetPlayerEntity()
+    end)
+    
+    if not ok or not player then
+        return false
+    end
+    
+    -- Check if player has a pet target index
+    local ok_index, pet_index = pcall(function()
+        return player.PetTargetIndex
+    end)
+    
+    if not ok_index or not pet_index or pet_index == 0 then
+        return false
+    end
+    
+    -- Verify the pet entity exists
+    local ok_pet, pet = pcall(function()
+        return GetEntity(pet_index)
+    end)
+    
+    if not ok_pet or not pet then
+        return false
+    end
+    
+    return true
+end
+
 -- ============================================================================
 -- Job State Management
 -- ============================================================================
@@ -257,6 +290,12 @@ ashita.events.register('command', 'pt_command', function(e)
         local ability_name = get_pet_command(pettranslator.current_job, cmd, pettranslator.job_level)
         
         if not ability_name then
+            return
+        end
+        
+        -- Check if player has an active pet
+        if not has_pet() then
+            print_msg('No pet detected', true)
             return
         end
         
