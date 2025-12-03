@@ -7,6 +7,7 @@ PetTranslator is an Ashita v4 addon for Final Fantasy XI that simplifies pet com
 
 - **Unified Commands:** Use simple `/pt` commands instead of remembering job-specific ability names
 - **Smart Translation:** Automatically translates `go`, `stop`, and `bye` commands to the correct pet ability based on your current job
+- **Pet Detection:** Validates that you have an active pet before attempting to issue commands
 - **Level Awareness:** Respects level requirements for each pet ability
 - **Flexible Targeting:** Support for custom targeting on attack commands (`<t>`, `<st>`, `<bt>`, etc.)
 - **Job Change Detection:** Automatically detects when you change jobs and updates available commands
@@ -74,6 +75,11 @@ PetTranslator provides three simple commands that work across all pet jobs:
 - If you're below the required level, commands are silently ignored
 - No error spam when abilities aren't available yet
 
+### Pet Validation
+- Checks that you have an active pet before issuing commands
+- Displays a warning if you attempt to use a pet command without a pet summoned
+- Prevents command errors and wasted actions
+
 ### Smart Targeting
 - **Go command:** Accepts any valid target or defaults to `<t>`
 - **Stop/Bye commands:** Always use `<me>` for safety
@@ -91,26 +97,11 @@ By default, PetTranslator runs silently and only displays messages when:
 ```
 Displays your current job and level (or indicates no pet job is active).
 
-### Debug Mode
-Enable detailed output with:
-```
-/pt debug
-```
-
-When debug mode is enabled, you'll see:
-- Command execution details
-- Pet ability names being used
-- Target information
-
-> **Example Debug Output:**  
-> [PetTranslator] Executing: /pet "Fight" &lt;t&gt;
-
 
 ## Compatibility
 
 - **Ashita v4** (required)
 - **Jobs:** Beastmaster, Summoner, Puppetmaster
-- **CatsEyeXI** server (designed for)
 
 
 ## License
@@ -136,10 +127,15 @@ Completely unnecessary AI generated image
 
 ## Changelog
 
-### Version 1.0 (Current)
+### Version 1.1 (Current)
+- Added pet detection validation before issuing commands
+- Enhanced error messaging with warning notifications
+- Improved code organization and removed unused debug system
+- Better error handling for edge cases
+
+### Version 1.0
 - Initial release with command translation for BST, SMN, and PUP
 - Support for `go`, `stop`, and `bye` commands
 - Automatic job detection and change monitoring
 - Level-based ability filtering
 - Flexible targeting for attack commands
-- Debug mode for troubleshooting
