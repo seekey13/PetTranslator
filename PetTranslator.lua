@@ -9,28 +9,23 @@ This addon is designed for Ashita v4 and the CatsEyeXI private server.
 
 addon.name      = 'PetTranslator';
 addon.author    = 'Seekey';
-addon.version   = '1.0';
+addon.version   = '1.1';
 addon.desc      = 'Translates pet abilities to readable names for BST, SMN, and PUP.';
 addon.link      = 'https://github.com/seekey13/PetTranslator';
 
 require('common');
 local chat = require('chat');
 
--- ============================================================================
--- Configuration
--- ============================================================================
-
-local default_settings = T{
-    -- Debug
-    debug_mode = false,
-};
+-- Custom print functions for categorized output.
+local function printf(fmt, ...)  print(chat.header(addon.name) .. chat.message(fmt:format(...))) end
+local function warnf(fmt, ...)   print(chat.header(addon.name) .. chat.warning(fmt:format(...))) end
+local function errorf(fmt, ...)  print(chat.header(addon.name) .. chat.error  (fmt:format(...))) end
 
 -- ============================================================================
 -- State Management
 -- ============================================================================
 
 local pettranslator = T{
-    settings = default_settings,
     current_job = nil,  -- Will be 'BST', 'SMN', 'PUP', or nil
     job_level = 0,
     last_job = nil,     -- Track last known job for change detection
@@ -95,12 +90,6 @@ end
 -- Helper Functions
 -- ============================================================================
 
--- Print a message with addon header
-local function print_msg(msg, is_error)
-    local output = chat.header(addon.name):append(is_error and chat.error(msg) or chat.message(msg))
-    print(output)
-end
-
 -- Reset job state to nil/0
 local function reset_job_state()
     pettranslator.current_job = nil
@@ -110,6 +99,39 @@ end
 -- Get safe job name for display (handles nil values)
 local function get_safe_job_name(job)
     return job or 'None'
+end
+
+-- Check if player has an active pet
+-- Returns: boolean (true if pet is active, false otherwise)
+local function has_pet()
+    -- Get player entity
+    local ok, player = pcall(function()
+        return GetPlayerEntity()
+    end)
+    
+    if not ok or not player then
+        return false
+    end
+    
+    -- Check if player has a pet target index
+    local ok_index, pet_index = pcall(function()
+        return player.PetTargetIndex
+    end)
+    
+    if not ok_index or not pet_index or pet_index == 0 then
+        return false
+    end
+    
+    -- Verify the pet entity exists
+    local ok_pet, pet = pcall(function()
+        return GetEntity(pet_index)
+    end)
+    
+    if not ok_pet or not pet then
+        return false
+    end
+    
+    return true
 end
 
 -- ============================================================================
@@ -165,20 +187,7 @@ local function handle_job_change()
         return
     end
     
-    -- Job changed - display message
-    if new_job then
-        print_msg(string.format('Job change detected: %s -> %s (Level %d)', 
-            get_safe_job_name(pettranslator.last_job),
-            new_job,
-            pettranslator.job_level))
-    elseif pettranslator.last_job then
-        -- Changed from pet job to non-pet job
-        print_msg(string.format('Job change detected: %s -> %s (addon dormant)', 
-            get_safe_job_name(pettranslator.last_job),
-            get_safe_job_name(new_job)))
-    end
-    
-    -- Update tracking
+    -- Update tracking (silently)
     pettranslator.last_job = new_job
 end
 
@@ -192,9 +201,9 @@ ashita.events.register('load', 'pt_load', function()
     pettranslator.last_job = job
     
     if job then
-        print_msg(string.format('Detected job: %s (Level %d)', job, pettranslator.job_level))
+        printf('Detected job: %s (Level %d)', job, pettranslator.job_level)
     else
-        print_msg('No pet job detected (addon dormant)')
+        printf('No pet job detected (addon dormant)')
     end
 end)
 
@@ -237,10 +246,11 @@ ashita.events.register('command', 'pt_command', function(e)
     
     -- No arguments - show status
     if #args == 1 then
-        local status = pettranslator.current_job 
-            and string.format('Current job: %s (Level %d)', pettranslator.current_job, pettranslator.job_level)
-            or 'No pet job detected'
-        print_msg(status)
+        if pettranslator.current_job then
+            printf('Current job: %s (Level %d)', pettranslator.current_job, pettranslator.job_level)
+        else
+            warnf('No pet job detected')
+        end
         return
     end
     
@@ -260,6 +270,12 @@ ashita.events.register('command', 'pt_command', function(e)
             return
         end
         
+        -- Check if player has an active pet
+        if not has_pet() then
+            warnf('No pet detected')
+            return
+        end
+        
         -- Determine target based on command type
         local target
         if cmd == 'go' then
@@ -274,13 +290,9 @@ ashita.events.register('command', 'pt_command', function(e)
         local pet_cmd = string.format('/pet "%s" %s', ability_name, target)
         AshitaCore:GetChatManager():QueueCommand(-1, pet_cmd)
         
-        if pettranslator.settings.debug_mode then
-            print_msg(string.format('Executing: %s', pet_cmd))
-        end
-        
         return
     end
     
     -- Unknown command
-    print_msg(string.format('Unknown command: %s', cmd), true)
+    errorf('Unknown command: %s', cmd)
 end)
