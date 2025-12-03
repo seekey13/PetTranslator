@@ -187,20 +187,7 @@ local function handle_job_change()
         return
     end
     
-    -- Job changed - display message
-    if new_job then
-        printf('Job change detected: %s -> %s (Level %d)', 
-            get_safe_job_name(pettranslator.last_job),
-            new_job,
-            pettranslator.job_level)
-    elseif pettranslator.last_job then
-        -- Changed from pet job to non-pet job
-        printf('Job change detected: %s -> %s (addon dormant)', 
-            get_safe_job_name(pettranslator.last_job),
-            get_safe_job_name(new_job))
-    end
-    
-    -- Update tracking
+    -- Update tracking (silently)
     pettranslator.last_job = new_job
 end
 
