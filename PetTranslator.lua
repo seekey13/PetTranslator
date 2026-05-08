@@ -9,7 +9,7 @@ This addon is designed for Ashita v4 and the CatsEyeXI private server.
 
 addon.name      = 'PetTranslator';
 addon.author    = 'Seekey';
-addon.version   = '1.1';
+addon.version   = '1.2';
 addon.desc      = 'Translates pet abilities to readable names for BST, SMN, and PUP.';
 addon.link      = 'https://github.com/seekey13/PetTranslator';
 
@@ -29,6 +29,9 @@ local pettranslator = T{
     current_job = nil,  -- Will be 'BST', 'SMN', 'PUP', or nil
     job_level = 0,
     last_job = nil,     -- Track last known job for change detection
+    autogo_enabled = false, -- Auto Go feature toggle
+    autogo_last_command_time = 0, -- Cooldown tracker for Auto Go
+    packet_update_pending = false, -- Prevent multiple pending job updates
 };
 
 -- ============================================================================
@@ -104,34 +107,23 @@ end
 -- Check if player has an active pet
 -- Returns: boolean (true if pet is active, false otherwise)
 local function has_pet()
-    -- Get player entity
-    local ok, player = pcall(function()
-        return GetPlayerEntity()
+    -- Single pcall wrapper for all checks to reduce overhead
+    local ok, result = pcall(function()
+        local player = GetPlayerEntity()
+        if not player then
+            return false
+        end
+        
+        local pet_index = player.PetTargetIndex
+        if not pet_index or pet_index == 0 then
+            return false
+        end
+        
+        local pet = GetEntity(pet_index)
+        return pet ~= nil
     end)
     
-    if not ok or not player then
-        return false
-    end
-    
-    -- Check if player has a pet target index
-    local ok_index, pet_index = pcall(function()
-        return player.PetTargetIndex
-    end)
-    
-    if not ok_index or not pet_index or pet_index == 0 then
-        return false
-    end
-    
-    -- Verify the pet entity exists
-    local ok_pet, pet = pcall(function()
-        return GetEntity(pet_index)
-    end)
-    
-    if not ok_pet or not pet then
-        return false
-    end
-    
-    return true
+    return ok and result or false
 end
 
 -- ============================================================================
@@ -211,22 +203,89 @@ end)
 ashita.events.register('packet_in', 'pt_packet_in', function(e)
     -- 0x1B = job info, 0x44 = character update, 0x1A = party update
     if (e.id == 0x1B or e.id == 0x44 or e.id == 0x1A) then
-        ashita.tasks.once(0.5, function()
-            handle_job_change()
-        end)
+        -- Prevent multiple pending updates
+        if not pettranslator.packet_update_pending then
+            pettranslator.packet_update_pending = true
+            ashita.tasks.once(1, function()
+                pettranslator.packet_update_pending = false
+                handle_job_change()
+            end)
+        end
     end
 end)
 
 ashita.events.register('d3d_present', 'pt_loop', function()
-    -- Update job state
-    local job = update_job_state()
-    
-    -- Addon is dormant if not BST, SMN, or PUP
-    if not job then
+    -- Early exit if addon is dormant (no pet job active)
+    if not pettranslator.current_job then
         return
     end
     
-    -- TODO: Add pet translation logic here
+    -- Auto Go Logic - only run if enabled
+    if not pettranslator.autogo_enabled then
+        return
+    end
+    
+    -- Throttle Auto Go checks to every 1 second
+    local current_time = os.clock()
+    if current_time - pettranslator.autogo_last_command_time < 1 then
+        return
+    end
+    
+    -- Single pcall wrapper for all Auto Go checks
+    local ok, should_go = pcall(function()
+        local mem = AshitaCore:GetMemoryManager()
+        local entity = mem:GetEntity()
+        local party = mem:GetParty()
+        
+        -- Get player index and status
+        local player_index = party:GetMemberTargetIndex(0)
+        local player_status = entity:GetStatus(player_index)
+        
+        -- Early exit: player not engaged
+        if player_status ~= 1 then
+            return false
+        end
+        
+        -- Get pet info
+        local pet_index = entity:GetPetTargetIndex(player_index)
+        
+        -- Early exit: no pet
+        if pet_index <= 0 then
+            return false
+        end
+        
+        local pet_status = entity:GetStatus(pet_index)
+        
+        -- Early exit: pet already engaged
+        if pet_status ~= 0 then
+            return false
+        end
+        
+        -- Get target info
+        local target_index = mem:GetTarget():GetTargetIndex(0)
+        
+        -- Early exit: no valid target
+        if not target_index or target_index == 0 then
+            return false
+        end
+        
+        -- Final check: target HP
+        if entity:GetHPPercent(target_index) <= 10 then
+            return false
+        end
+        
+        return true
+    end)
+    
+    -- If all conditions met, issue deploy command
+    if ok and should_go then
+        local ability_name = get_pet_command(pettranslator.current_job, 'go', pettranslator.job_level)
+        
+        if ability_name then
+            AshitaCore:GetChatManager():QueueCommand(1, string.format('/pet "%s" <t>', ability_name))
+            pettranslator.autogo_last_command_time = current_time
+        end
+    end
 end)
 
 -- ============================================================================
@@ -248,6 +307,7 @@ ashita.events.register('command', 'pt_command', function(e)
     if #args == 1 then
         if pettranslator.current_job then
             printf('Current job: %s (Level %d)', pettranslator.current_job, pettranslator.job_level)
+            printf('Auto Go: %s', pettranslator.autogo_enabled and 'Enabled' or 'Disabled')
         else
             warnf('No pet job detected')
         end
@@ -255,6 +315,13 @@ ashita.events.register('command', 'pt_command', function(e)
     end
     
     local cmd = args[2]:lower()
+    
+    -- Handle autogo toggle
+    if cmd == 'autogo' then
+        pettranslator.autogo_enabled = not pettranslator.autogo_enabled
+        printf('Auto Go: %s', pettranslator.autogo_enabled and 'Enabled' or 'Disabled')
+        return
+    end
     
     -- Handle pet commands: go, stop, bye
     if cmd == 'go' or cmd == 'stop' or cmd == 'bye' then
