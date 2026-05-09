@@ -233,44 +233,50 @@ ashita.events.register('d3d_present', 'pt_loop', function()
     
     -- Single pcall wrapper for all Auto Go checks
     local ok, should_go = pcall(function()
-        local mem = AshitaCore:GetMemoryManager()
-        local entity = mem:GetEntity()
-        local party = mem:GetParty()
-        
-        -- Get player index and status
-        local player_index = party:GetMemberTargetIndex(0)
-        local player_status = entity:GetStatus(player_index)
+        local player = GetPlayerEntity()
+        if not player then
+            return false
+        end
         
         -- Early exit: player not engaged
-        if player_status ~= 1 then
+        if player.Status ~= 1 then
             return false
         end
         
         -- Get pet info
-        local pet_index = entity:GetPetTargetIndex(player_index)
+        local pet_index = player.PetTargetIndex
         
         -- Early exit: no pet
-        if pet_index <= 0 then
+        if not pet_index or pet_index == 0 then
             return false
         end
         
-        local pet_status = entity:GetStatus(pet_index)
+        local pet = GetEntity(pet_index)
+        if not pet then
+            return false
+        end
         
         -- Early exit: pet already engaged
-        if pet_status ~= 0 then
+        if pet.Status ~= 0 then
             return false
         end
         
         -- Get target info
-        local target_index = mem:GetTarget():GetTargetIndex(0)
+        local target = AshitaCore:GetMemoryManager():GetTarget()
+        local target_index = target:GetTargetIndex(0)
         
         -- Early exit: no valid target
         if not target_index or target_index == 0 then
             return false
         end
         
+        local target_entity = GetEntity(target_index)
+        if not target_entity then
+            return false
+        end
+        
         -- Final check: target HP
-        if entity:GetHPPercent(target_index) <= 10 then
+        if target_entity.HPPercent <= 10 then
             return false
         end
         
